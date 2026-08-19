@@ -168,13 +168,22 @@ func (c *Coordinator) Begin(ctx context.Context, txnID string, resources []strin
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	seen := make(map[string]struct{}, len(resources))
 	for _, r := range resources {
 		if r == "" {
 			return errors.New("resource name is empty")
 		}
+		// Reject a repeated resource up front: a duplicate would otherwise
+		// reach the store and trip the participants PRIMARY KEY (txn_id,
+		// resource) as a generic storage error (500), not a client error.
+		// Detecting it here means no storage call and no half-created txn.
+		if _, ok := seen[r]; ok {
+			return fmt.Errorf("duplicate resource %q", r)
+		}
 		if _, ok := c.resources[r]; !ok {
 			return store.ErrResourceMissing
 		}
+		seen[r] = struct{}{}
 	}
 	return c.store.BeginTxn(ctx, txnID, resources, c.clock.Now())
 }

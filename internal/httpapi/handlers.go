@@ -13,7 +13,7 @@
 //   - store.ErrInvalidState          -> 409 (with current state in the body)
 //   - store.ErrNoDecision            -> 409 PREPARING
 //   - store.ErrNotTerminal           -> 409 (txn not terminal)
-//   - input validation errors        -> 400
+//   - input validation errors       -> 400 (incl. duplicate resource in Begin)
 //   - anything else                  -> 500
 package httpapi
 
@@ -199,11 +199,12 @@ func mapError(err error) (int, string) {
 }
 
 // isValidationError recognises sentinel validation errors produced by the
-// coordinator (empty name, bad vote, empty txn_id, empty resources). They are
-// created with errors.New so we match by message substring.
+// coordinator (empty name, bad vote, empty txn_id, empty resources, duplicate
+// resource). They are created with errors.New / fmt.Errorf so we match by
+// message substring.
 func isValidationError(err error) bool {
 	msg := err.Error()
-	for _, p := range []string{"is empty", "must be", "vote"} {
+	for _, p := range []string{"is empty", "must be", "vote", "duplicate"} {
 		if strings.Contains(msg, p) {
 			return true
 		}

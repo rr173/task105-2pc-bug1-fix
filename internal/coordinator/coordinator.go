@@ -129,10 +129,12 @@ func (c *Coordinator) UpdateResourceVote(ctx context.Context, name, vote string)
 	}
 	c.mu.Lock()
 	if ir, ok := c.resources[name].(*InMemoryResource); ok {
-		// Keep the live participant handle in sync with the configured vote
-		// in both directions. A resource reconfigured from "no" to "yes" must
-		// observe the new vote on subsequently prepared transactions so they
-		// reach commit; leaving the stale "no" would wrongly abort them.
+		// Refresh the live participant's vote in both directions so a resource
+		// reconfigured from "no" to "yes" observes the new vote on every
+		// subsequently prepared transaction. A stale "no" would otherwise make
+		// those transactions abort and roll back, contradicting the latest
+		// configuration, so the update must apply unconditionally rather than
+		// only when switching from "yes" to "no".
 		ir.SetVote(vote)
 	} else {
 		c.resources[name] = NewInMemoryResource(name, vote)
